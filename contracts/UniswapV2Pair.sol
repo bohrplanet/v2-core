@@ -77,15 +77,22 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     // update reserves and, on the first call per block, price accumulators
     function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
         require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
+        // 为了节省空间，所以timestamp使用32位
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
         uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+        // timeElapsed大于0，意味着更新预言机这个操作不会在同一个区块进行一次以上
+        // 也就是会在区块的第一笔update的时候执行
         if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             // * never overflows, and + overflow is desired
+            // 注意在这里并没有更新最新的价格，此时_reserve，也就是储备金还是上一次交易的数值
+            // 这么做的原因是为了增加价格被操纵的成本
             price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
             price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
         }
+        // 更新储备金
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
+        // 更新最后一次的timeStamp
         blockTimestampLast = blockTimestamp;
         emit Sync(reserve0, reserve1);
     }
